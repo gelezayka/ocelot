@@ -8,6 +8,8 @@
 #include <cerrno>
 #include <mutex>
 
+#include "log.h"
+
 // Define the connection mother (first half) and connection middlemen (second half)
 
 //TODO Better errors
@@ -23,7 +25,7 @@ connection_mother::connection_mother(worker * worker_obj, config * config_obj, m
 	// Stop old sockets from hogging the port
 	int yes = 1;
 	if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-		std::cout << "Could not reuse socket" << std::endl;
+		wlog(L_CRIT, "Could not reuse socket");
 	}
 
 	// Create libev event loop
@@ -40,21 +42,21 @@ connection_mother::connection_mother(worker * worker_obj, config * config_obj, m
 
 	// Bind
 	if (bind(listen_socket, (sockaddr *) &address, sizeof(address)) == -1) {
-		std::cout << "Bind failed " << errno << std::endl;
+		wlog(L_CRIT, "Bind failed %d", errno);
 	}
 
 	// Listen
 	if (listen(listen_socket, conf->max_connections) == -1) {
-		std::cout << "Listen failed" << std::endl;
+		wlog(L_CRIT, "Listen failed");
 	}
 
 	// Set non-blocking
 	int flags = fcntl(listen_socket, F_GETFL);
 	if (flags == -1) {
-		std::cout << "Could not get socket flags" << std::endl;
+		wlog(L_CRIT, "Could not get socket flags");
 	}
 	if (fcntl(listen_socket, F_SETFL, flags | O_NONBLOCK) == -1) {
-		std::cout << "Could not set non-blocking" << std::endl;
+		wlog(L_CRIT, "Could not set non-blocking");
 	}
 
 	// Create libev timer
@@ -64,7 +66,7 @@ connection_mother::connection_mother(worker * worker_obj, config * config_obj, m
 	schedule_event.set(conf->schedule_interval, conf->schedule_interval); // After interval, every interval
 	schedule_event.start();
 
-	std::cout << "Sockets up, starting event loop!" << std::endl;
+	wlog(L_INFO, "Sockets up, starting event loop!");
 	ev_loop(ev_default_loop(0), 0);
 }
 
@@ -97,7 +99,7 @@ connection_middleman::connection_middleman(int &listen_socket, sockaddr_in &addr
 
 	connect_sock = accept(listen_socket, (sockaddr *) &address, &addr_len);
 	if (connect_sock == -1) {
-		std::cout << "Accept failed, errno " << errno << ": " << strerror(errno) << std::endl;
+		wlog(L_CRIT, "Accept failed, errno %d:%s", errno, strerror(errno));
 		delete this;
 		std::unique_lock<std::mutex> lock(stats.mutex);
 		stats.open_connections++; // destructor decrements open connections
@@ -107,10 +109,10 @@ connection_middleman::connection_middleman(int &listen_socket, sockaddr_in &addr
 	// Set non-blocking
 	int flags = fcntl(connect_sock, F_GETFL);
 	if (flags == -1) {
-		std::cout << "Could not get connect socket flags" << std::endl;
+		wlog(L_CRIT, "Could not get connect socket flags");
 	}
 	if (fcntl(connect_sock, F_SETFL, flags | O_NONBLOCK) == -1) {
-		std::cout << "Could not set non-blocking" << std::endl;
+		wlog(L_CRIT, "Could not set non-blocking");
 	}
 
 	// Get their info

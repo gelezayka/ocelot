@@ -5,6 +5,7 @@
 #include "events.h"
 #include "schedule.h"
 
+#include "log.h"
 
 schedule::schedule(connection_mother * mother_obj, worker* worker_obj, config* conf_obj, mysql * db_obj) : mother(mother_obj), work(worker_obj), conf(conf_obj), db(db_obj) {
 	counter = 0;
@@ -16,13 +17,12 @@ schedule::schedule(connection_mother * mother_obj, worker* worker_obj, config* c
 void schedule::handle(ev::timer &watcher, int events_flags) {
 	stats.connection_rate = (stats.opened_connections - last_opened_connections) / conf->schedule_interval;
 	if (counter % 20 == 0) {
-		std::cout << "Schedule run #" << counter << " - open: " << stats.open_connections << ", opened: "
-		<< stats.opened_connections << ", speed: "
-		<< stats.connection_rate << "/s" << std::endl;
+		wlog(L_INFO, "Schedule run #%d - open: %d, opened: %d, speed: %d/s", counter, 
+			stats.open_connections, stats.opened_connections, stats.connection_rate);
 	}
 
 	if (work->get_status() == CLOSING && db->all_clear()) {
-		std::cout << "all clear, shutting down" << std::endl;
+		wlog(L_CRIT, "all clear, shutting down");
 		exit(0);
 	}
 

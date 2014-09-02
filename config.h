@@ -5,6 +5,7 @@
 
 class config {
 	public:
+		bool clean_peer_on_start;
 		std::string host;
 		unsigned int port;
 		unsigned int max_connections;

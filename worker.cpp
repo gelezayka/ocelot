@@ -229,7 +229,7 @@ std::string worker::work(std::string &input, std::string &ip) {
 	// Either a scrape or an announce
 	user_list::iterator u;
 	if(torrent_pass0.length() == 32)  {
-	    int user_id = atoi(hex_decode(torrent_pass0.substr(0, 8)).c_str());
+	    int user_id = hex2dec(torrent_pass0.substr(0, 8));
 	    u = users_list.find(user_id);
 	} else {
 	    return error("Passkey incorrect length");
@@ -320,6 +320,7 @@ std::string worker::announce(torrent &tor, user_ptr &u, params_type &params, par
 		active = 0;
 	}
 	int userid = u->get_id();
+
 	peer * p;
 	peer_list::iterator peer_it;
 	// Insert/find the peer in the torrent list

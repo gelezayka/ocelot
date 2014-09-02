@@ -3,7 +3,7 @@ AM_INIT_AUTOMAKE([1.11 no-define foreign])
 AC_PROG_CXX
 AC_CONFIG_FILES([Makefile])
 
-AX_CHECK_COMPILE_FLAG([-std=c++11], [], [AC_MSG_ERROR([Compiler does not support -std=c++11])])
+dnl AX_CHECK_COMPILE_FLAG([-std=c++11], [], [AC_MSG_ERROR([Compiler does not support -std=c++11])])
 AX_BOOST_BASE([1.37], [], [AC_MSG_ERROR(Need boost >= 1.37)])
 AX_BOOST_IOSTREAMS
 AX_BOOST_SYSTEM

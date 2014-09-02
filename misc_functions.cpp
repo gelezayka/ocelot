@@ -25,6 +25,33 @@ std::string inttostr(const int i) {
 	return str;
 }
 
+static int hex_decode(char v)
+{
+        if (v >= '0' && v <= '9')
+                return v - '0';
+        if (v >= 'A' && v <= 'F')
+                return v - 'A' + 10;
+        if (v >= 'a' && v <= 'f')
+                return v - 'a' + 10;
+        return -1;
+};
+
+unsigned long long hex2dec_c(const char *s)
+{
+    unsigned long long n = 0;
+    int i, len = strlen(s);
+    for(i=0; i < len; i++)
+    {
+	n = n * 16 + hex_decode(s[i]);
+    }
+    return n;
+}
+
+unsigned long long hex2dec(const std::string &in) 
+{
+    return hex2dec_c(in.c_str());
+}
+
 std::string hex_decode(const std::string &in) {
 	std::string out;
 	out.reserve(20);

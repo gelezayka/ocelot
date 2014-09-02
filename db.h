@@ -46,7 +46,7 @@ class mysql {
 	public:
 		bool verbose_flush;
 
-		mysql(std::string mysql_db, std::string mysql_host, std::string username, std::string password);
+		mysql(std::string mysql_db, std::string mysql_host, std::string username, std::string password, bool clean_peer);
 		bool connected();
 		void load_torrents(torrent_list &torrents);
 		void load_users(user_list &users);
