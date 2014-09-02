@@ -55,7 +55,7 @@ typedef struct {
 } del_message;
 
 typedef std::unordered_map<std::string, torrent> torrent_list;
-typedef std::unordered_map<std::string, user_ptr> user_list;
+typedef std::map<int, user_ptr> user_list;
 typedef std::unordered_map<std::string, std::string> params_type;
 
 struct stats {

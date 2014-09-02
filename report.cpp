@@ -37,13 +37,19 @@ std::string report(params_type &params, user_list &users_list) {
 		<< stats.bytes_written << " bytes written\n";
 	} else if (action == "user") {
 		std::string key = params["key"];
-		if (key == "") {
+		int user_id = atoi(params["user_id"].c_str());
+
+		if (key == "" || user_id == 0) {
 			output << "Invalid action\n";
 		} else {
-			user_list::const_iterator u = users_list.find(key);
+			user_list::const_iterator u = users_list.find(user_id);
 			if (u != users_list.end()) {
-				output << u->second->get_leeching() << " leeching\n"
-				<< u->second->get_seeding() << " seeding\n";
+				if(u->second->get_auth_key() == key) {
+				    output << u->second->get_leeching() << " leeching\n"
+				    << u->second->get_seeding() << " seeding\n";
+				} else {
+				    output << "Auth error\n";
+				}
 			}
 		}
 	} else {

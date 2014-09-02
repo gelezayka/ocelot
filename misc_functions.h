@@ -7,6 +7,6 @@ int64_t strtolonglong(const std::string& str);
 std::string inttostr(int i);
 std::string hex_decode(const std::string &in);
 std::string bintohex(const std::string &in);
-int timeval_subtract (timeval* result, timeval* x, timeval* y);
+//int timeval_subtract (timeval* result, timeval* x, timeval* y);
 
 #endif

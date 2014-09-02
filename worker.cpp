@@ -43,6 +43,10 @@ bool worker::signal(int sig) {
 		return false;
 	}
 }
+
+#define PASS_SIZE1 10
+#define PASS_SIZE2 32
+
 std::string worker::work(std::string &input, std::string &ip) {
 	unsigned int input_length = input.length();
 
@@ -51,20 +55,57 @@ std::string worker::work(std::string &input, std::string &ip) {
 		return error("GET string too short");
 	}
 
+        size_t e = input.find('?');
+        if (e == std::string::npos)
+                e = input.size();
+
+	std::string torrent_pass0 = "";
+
+        size_t a = 4;
+        if (a < e && input[a] == '/')
+        {
+                do { a++;
+                } while (a < e && input[a] == '/');
+
+                if (a + 1 < e && input[a + 1] == '/')
+                        a += 2;
+
+                // TorrentPier begin
+                if (a + 2 < e && input[a + 2] == '/') // Skip "/bt/"
+                        a += 3;
+
+                if (a + PASS_SIZE1 < e && input[a + PASS_SIZE1] == '/')
+                {
+                        torrent_pass0 = input.substr(a, PASS_SIZE1);
+                        a += PASS_SIZE1+1;
+                }
+
+                if (a + PASS_SIZE2 < e && input[a + PASS_SIZE2] == '/')
+                {
+                        torrent_pass0 = input.substr(a, PASS_SIZE2);
+                        a += PASS_SIZE2+1;
+                }
+                // TorrentPier end
+        }
+
+	//std::cout << "pass0: " << torrent_pass0  << std::endl;
+
 	size_t pos = 5; // skip 'GET /'
 
 	// Get the passkey
 	std::string passkey;
 	passkey.reserve(10);
-	if (input[15] != '/') {
-		return error("Malformed announce");
+	if(torrent_pass0.length() != 32 && torrent_pass0.length() != 10) {
+//	if (input[15] != '/') {
+//		return error("Malformed announce");
+		return error("Passkey not found");
 	}
 
-	for (; pos < 15; pos++) {
-		passkey.push_back(input[pos]);
-	}
+//	for (; pos < 15; pos++) {
+//		passkey.push_back(input[pos]);
+//	}
 
-	pos = 16;
+	pos = torrent_pass0.length() + 6;
 
 	// Get the action
 	enum action_t {
@@ -186,8 +227,14 @@ std::string worker::work(std::string &input, std::string &ip) {
 	}
 
 	// Either a scrape or an announce
+	user_list::iterator u;
+	if(torrent_pass0.length() == 32)  {
+	    int user_id = atoi(hex_decode(torrent_pass0.substr(0, 8)).c_str());
+	    u = users_list.find(user_id);
+	} else {
+	    return error("Passkey incorrect length");
+	}
 
-	user_list::iterator u = users_list.find(passkey);
 	if (u == users_list.end()) {
 		return error("Passkey not found");
 	}
@@ -715,14 +762,14 @@ std::string worker::scrape(const std::list<std::string> &infohashes, params_type
 //TODO: Restrict to local IPs
 std::string worker::update(params_type &params) {
 	if (params["action"] == "change_passkey") {
+		int user_id = atoi(params["user_id"].c_str());
 		std::string oldpasskey = params["oldpasskey"];
 		std::string newpasskey = params["newpasskey"];
-		auto u = users_list.find(oldpasskey);
+		auto u = users_list.find(user_id);
 		if (u == users_list.end()) {
 			std::cout << "No user with passkey " << oldpasskey << " exists when attempting to change passkey to " << newpasskey << std::endl;
 		} else {
-			users_list[newpasskey] = u->second;
-			users_list.erase(oldpasskey);
+			u->second->set_auth_key(newpasskey);
 			std::cout << "Changed passkey from " << oldpasskey << " to " << newpasskey << " for user " << u->second->get_id() << std::endl;
 		}
 	} else if (params["action"] == "add_torrent") {
@@ -822,18 +869,19 @@ std::string worker::update(params_type &params) {
 	} else if (params["action"] == "add_user") {
 		std::string passkey = params["passkey"];
 		unsigned int userid = strtolong(params["id"]);
-		auto u = users_list.find(passkey);
+		auto u = users_list.find(userid);
 		if (u == users_list.end()) {
 			bool protect_ip = params["visible"] == "1";
-			user_ptr u(new user(userid, true, protect_ip));
-			users_list.insert(std::pair<std::string, user_ptr>(passkey, u));
+			user_ptr u(new user(userid, true, protect_ip, passkey));
+			users_list.insert(std::pair<int, user_ptr>(userid, u));
 			std::cout << "Added user " << passkey << " with id " << userid << std::endl;
 		} else {
 			std::cout << "Tried to add already known user " << passkey << " with id " << userid << std::endl;
 		}
 	} else if (params["action"] == "remove_user") {
 		std::string passkey = params["passkey"];
-		auto u = users_list.find(passkey);
+		unsigned int userid = strtolong(params["user_id"]);
+		auto u = users_list.find(userid);
 		if (u != users_list.end()) {
 			std::cout << "Removed user " << passkey << " with id " << u->second->get_id() << std::endl;
 			users_list.erase(u);
@@ -841,16 +889,18 @@ std::string worker::update(params_type &params) {
 	} else if (params["action"] == "remove_users") {
 		// Each passkey is exactly 10 characters long.
 		std::string passkeys = params["passkeys"];
+		unsigned int userid = strtolong(params["user_id"]);
 		for (unsigned int pos = 0; pos < passkeys.length(); pos += 10) {
 			std::string passkey = passkeys.substr(pos, 10);
-			auto u = users_list.find(passkey);
-			if (u != users_list.end()) {
+			auto u = users_list.find(userid);
+			if ((u != users_list.end()) && (passkey == u->second->get_auth_key())) {
 				std::cout << "Removed user " << passkey << std::endl;
-				users_list.erase(passkey);
+				users_list.erase(u);
 			}
 		}
 	} else if (params["action"] == "update_user") {
 		std::string passkey = params["passkey"];
+		unsigned int userid = strtolong(params["user_id"]);
 		bool can_leech = true;
 		bool protect_ip = false;
 		if (params["can_leech"] == "0") {
@@ -859,7 +909,7 @@ std::string worker::update(params_type &params) {
 		if (params["visible"] == "0") {
 			protect_ip = true;
 		}
-		user_list::iterator i = users_list.find(passkey);
+		user_list::iterator i = users_list.find(userid);
 		if (i == users_list.end()) {
 			std::cout << "No user with passkey " << passkey << " found when attempting to change leeching status!" << std::endl;
 		} else {

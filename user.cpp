@@ -1,6 +1,7 @@
 #include "user.h"
 
-user::user(int uid, bool leech, bool protect) : id(uid), leechstatus(leech), protect_ip(protect) {
+user::user(int uid, bool leech, bool protect, std::string key) : id(uid), leechstatus(leech), protect_ip(protect) {
+	auth_key = key;
 	stats.leeching = 0;
 	stats.seeding = 0;
 }
@@ -48,4 +49,14 @@ void user::incr_leeching() {
 
 void user::incr_seeding() {
 	stats.seeding++;
+}
+
+std::string user::get_auth_key()
+{
+    return auth_key;
+}
+
+void user::set_auth_key(std::string key)
+{
+    auth_key = key;
 }
