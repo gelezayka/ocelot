@@ -25,6 +25,7 @@
 #include "response.h"
 #include "report.h"
 #include "user.h"
+#include "log.h"
 
 //---------- Worker - does stuff with input
 worker::worker(torrent_list &torrents, user_list &users, std::vector<std::string> &_whitelist, config * conf_obj, mysql * db_obj) : torrents_list(torrents), users_list(users), whitelist(_whitelist), conf(conf_obj), db(db_obj)
@@ -34,10 +35,10 @@ worker::worker(torrent_list &torrents, user_list &users, std::vector<std::string
 bool worker::signal(int sig) {
 	if (status == OPEN) {
 		status = CLOSING;
-		std::cout << "closing tracker... press Ctrl-C again to terminate" << std::endl;
+		wlog(L_INFO, "closing tracker... press Ctrl-C again to terminate");
 		return false;
 	} else if (status == CLOSING) {
-		std::cout << "shutting down uncleanly" << std::endl;
+		wlog(L_INFO, "shutting down uncleanly");
 		return true;
 	} else {
 		return false;
@@ -87,8 +88,6 @@ std::string worker::work(std::string &input, std::string &ip) {
                 }
                 // TorrentPier end
         }
-
-	//std::cout << "pass0: " << torrent_pass0  << std::endl;
 
 	size_t pos = 5; // skip 'GET /'
 
@@ -768,10 +767,10 @@ std::string worker::update(params_type &params) {
 		std::string newpasskey = params["newpasskey"];
 		auto u = users_list.find(user_id);
 		if (u == users_list.end()) {
-			std::cout << "No user with passkey " << oldpasskey << " exists when attempting to change passkey to " << newpasskey << std::endl;
+			wlog(L_INFO, "No user with passkey %s exists when attempting to change passkey to %s", oldpasskey.c_str(), newpasskey.c_str());
 		} else {
 			u->second->set_auth_key(newpasskey);
-			std::cout << "Changed passkey from " << oldpasskey << " to " << newpasskey << " for user " << u->second->get_id() << std::endl;
+			wlog(L_INFO, "Changed passkey from %s to %s for user %d", oldpasskey.c_str(), newpasskey.c_str(), u->second->get_id());
 		}
 	} else if (params["action"] == "add_torrent") {
 		torrent *t;
@@ -794,7 +793,7 @@ std::string worker::update(params_type &params) {
 		} else {
 			t->free_torrent = NEUTRAL;
 		}
-		std::cout << "Added torrent " << t->id << ". FL: " << t->free_torrent << " " << params["freetorrent"] << std::endl;
+		wlog(L_INFO, "Added torrent %d  FL: %d %s", t->id, t->free_torrent, params["freetorrent"].c_str());
 	} else if (params["action"] == "update_torrent") {
 		std::string info_hash = params["info_hash"];
 		info_hash = hex_decode(info_hash);
@@ -809,9 +808,9 @@ std::string worker::update(params_type &params) {
 		auto torrent_it = torrents_list.find(info_hash);
 		if (torrent_it != torrents_list.end()) {
 			torrent_it->second.free_torrent = fl;
-			std::cout << "Updated torrent " << torrent_it->second.id << " to FL " << fl << std::endl;
+			wlog(L_INFO, "Updated torrent %d to FL: %d", torrent_it->second.id, fl);
 		} else {
-			std::cout << "Failed to find torrent " << info_hash << " to FL " << fl << std::endl;
+			wlog(L_WARN, "Failed to find torrent %s to FL ", info_hash.c_str(), fl);
 		}
 	} else if (params["action"] == "update_torrents") {
 		// Each decoded infohash is exactly 20 characters long.
@@ -830,9 +829,9 @@ std::string worker::update(params_type &params) {
 			auto torrent_it = torrents_list.find(info_hash);
 			if (torrent_it != torrents_list.end()) {
 				torrent_it->second.free_torrent = fl;
-				std::cout << "Updated torrent " << torrent_it->second.id << " to FL " << fl << std::endl;
+				wlog(L_INFO, "Updated torrent %d to FL: %d", torrent_it->second.id, fl);
 			} else {
-				std::cout << "Failed to find torrent " << info_hash << " to FL " << fl << std::endl;
+				wlog(L_WARN, "Failed to find torrent %s to FL ", info_hash.c_str(), fl);
 			}
 		}
 	}  else if (params["action"] == "delete_torrent") {
@@ -845,7 +844,7 @@ std::string worker::update(params_type &params) {
 		}
 		auto torrent_it = torrents_list.find(info_hash);
 		if (torrent_it != torrents_list.end()) {
-			std::cout << "Deleting torrent " << torrent_it->second.id << " for the reason '" << get_del_reason(reason) << "'" << std::endl;
+			wlog(L_INFO, "Deleting torrent %d for the reason '%s'", torrent_it->second.id, get_del_reason(reason).c_str());
 			std::unique_lock<std::mutex> stats_lock(stats.mutex);
 			stats.leechers -= torrent_it->second.leechers.size();
 			stats.seeders -= torrent_it->second.seeders.size();
@@ -865,7 +864,7 @@ std::string worker::update(params_type &params) {
 			del_reasons[info_hash] = msg;
 			torrents_list.erase(torrent_it);
 		} else {
-			std::cout << "Failed to find torrent " << bintohex(info_hash) << " to delete " << std::endl;
+			wlog(L_INFO, "Failed to find torrent %s to delete", bintohex(info_hash).c_str());
 		}
 	} else if (params["action"] == "add_user") {
 		std::string passkey = params["passkey"];
@@ -875,16 +874,16 @@ std::string worker::update(params_type &params) {
 			bool protect_ip = params["visible"] == "1";
 			user_ptr u(new user(userid, true, protect_ip, passkey));
 			users_list.insert(std::pair<int, user_ptr>(userid, u));
-			std::cout << "Added user " << passkey << " with id " << userid << std::endl;
+			wlog(L_INFO, "Added user %d with passkey %s", userid, passkey.c_str());
 		} else {
-			std::cout << "Tried to add already known user " << passkey << " with id " << userid << std::endl;
+			wlog(L_WARN, "Tried to add already known user %d with passkey %s", userid, passkey.c_str());
 		}
 	} else if (params["action"] == "remove_user") {
 		std::string passkey = params["passkey"];
 		unsigned int userid = strtolong(params["user_id"]);
 		auto u = users_list.find(userid);
 		if (u != users_list.end()) {
-			std::cout << "Removed user " << passkey << " with id " << u->second->get_id() << std::endl;
+			wlog(L_INFO, "Removed user %d with passkey %s", u->second->get_id(), passkey.c_str());
 			users_list.erase(u);
 		}
 	} else if (params["action"] == "remove_users") {
@@ -895,7 +894,7 @@ std::string worker::update(params_type &params) {
 			std::string passkey = passkeys.substr(pos, 10);
 			auto u = users_list.find(userid);
 			if ((u != users_list.end()) && (passkey == u->second->get_auth_key())) {
-				std::cout << "Removed user " << passkey << std::endl;
+				wlog(L_INFO, "Removed user %d with passkey %s", userid, passkey.c_str());
 				users_list.erase(u);
 			}
 		}
@@ -912,16 +911,16 @@ std::string worker::update(params_type &params) {
 		}
 		user_list::iterator i = users_list.find(userid);
 		if (i == users_list.end()) {
-			std::cout << "No user with passkey " << passkey << " found when attempting to change leeching status!" << std::endl;
+			wlog(L_WARN, "No user %d with passkey %s found when attempting to change leeching status!", userid, passkey.c_str());
 		} else {
 			i->second->set_protected(protect_ip);
 			i->second->set_leechstatus(can_leech);
-			std::cout << "Updated user " << passkey << std::endl;
+			wlog(L_INFO, "Updated user %d with passkey %s", userid, passkey.c_str());
 		}
 	} else if (params["action"] == "add_whitelist") {
 		std::string peer_id = params["peer_id"];
 		whitelist.push_back(peer_id);
-		std::cout << "Whitelisted " << peer_id << std::endl;
+		wlog(L_INFO, "Whitelisted %s", peer_id.c_str());
 	} else if (params["action"] == "remove_whitelist") {
 		std::string peer_id = params["peer_id"];
 		for (unsigned int i = 0; i < whitelist.size(); i++) {
@@ -930,7 +929,7 @@ std::string worker::update(params_type &params) {
 				break;
 			}
 		}
-		std::cout << "De-whitelisted " << peer_id << std::endl;
+		wlog(L_INFO, "De-whitelisted %s", peer_id.c_str());
 	} else if (params["action"] == "edit_whitelist") {
 		std::string new_peer_id = params["new_peer_id"];
 		std::string old_peer_id = params["old_peer_id"];
@@ -941,22 +940,21 @@ std::string worker::update(params_type &params) {
 			}
 		}
 		whitelist.push_back(new_peer_id);
-		std::cout << "Edited whitelist item from " << old_peer_id << " to " << new_peer_id << std::endl;
+		wlog(L_INFO, "Edited whitelist item from %s to %s", old_peer_id.c_str(), new_peer_id.c_str());
 	} else if (params["action"] == "update_announce_interval") {
 		unsigned int interval = strtolong(params["new_announce_interval"]);
 		conf->announce_interval = interval;
-		std::cout << "Edited announce interval to " << interval << std::endl;
+		wlog(L_INFO, "Edited announce interval to %d", interval);
 	} else if (params["action"] == "info_torrent") {
 		std::string info_hash_hex = params["info_hash"];
 		//std::string info_hash = hex_decode(info_hash_hex);
 		std::string info_hash = params["info_hash"];
-		std::cout << "Info for torrent '" << info_hash_hex << "'" << std::endl;
+		wlog(L_INFO, "Info for torrent '%s'", info_hash_hex.c_str());
 		auto torrent_it = torrents_list.find(info_hash);
 		if (torrent_it != torrents_list.end()) {
-			std::cout << "Torrent " << torrent_it->second.id
-				<< ", freetorrent = " << torrent_it->second.free_torrent << std::endl;
+			wlog(L_INFO, "Torrent %d, freetorrent = %d", torrent_it->second.id, torrent_it->second.free_torrent);
 		} else {
-			std::cout << "Failed to find torrent " << info_hash_hex << std::endl;
+			wlog(L_WARN, "Failed to find torrent %s", info_hash_hex.c_str());
 		}
 	}
 	return response("success", false, false);
@@ -980,7 +978,7 @@ void worker::do_start_reaper() {
 }
 
 void worker::reap_peers() {
-	std::cout << "Starting peer reaper" << std::endl;
+	wlog(L_INFO, "Starting peer reaper");;
 	cur_time = time(NULL);
 	unsigned int reaped_l = 0, reaped_s = 0;
 	unsigned int cleared_torrents = 0;
@@ -1030,12 +1028,12 @@ void worker::reap_peers() {
 		stats.leechers -= reaped_l;
 		stats.seeders -= reaped_s;
 	}
-	std::cout << "Reaped " << reaped_l << " leechers and " << reaped_s << " seeders. Reset " << cleared_torrents << " torrents" << std::endl;
+	wlog(L_INFO, "Reaped %d leechers and %d seeders. Reset %d torrents", reaped_l, reaped_s, cleared_torrents);
 }
 
 void worker::reap_del_reasons()
 {
-	std::cout << "Starting del reason reaper" << std::endl;
+	wlog(L_INFO, "Starting del reason reaper");
 	time_t max_time = time(NULL) - conf->del_reason_lifetime;
 	auto it = del_reasons.begin();
 	unsigned int reaped = 0;
@@ -1049,7 +1047,7 @@ void worker::reap_del_reasons()
 		}
 		++it;
 	}
-	std::cout << "Reaped " << reaped << " del reasons" << std::endl;
+	wlog(L_INFO, "Reaped %d del reasons", reaped);
 }
 
 std::string worker::get_del_reason(int code)

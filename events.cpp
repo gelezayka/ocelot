@@ -117,7 +117,7 @@ connection_middleman::connection_middleman(int &listen_socket, sockaddr_in &addr
 
 	// Get their info
 	if (getpeername(connect_sock, (sockaddr *) &client_addr, &addr_len) == -1) {
-		//std::cout << "Could not get client info" << std::endl;
+		wlog(L_WARN, "Could not get client info");
 	}
 	request.reserve(conf->max_read_buffer);
 	written = 0;
