@@ -7,7 +7,7 @@
 #include "response.h"
 #include "user.h"
 
-std::string report(params_type &params, user_list &users_list) {
+std::string report(params_type &params, user_list &users_list, torrent_list &torrents) {
 	std::stringstream output;
 	std::string action = params["get"];
 	if (action == "") {
@@ -35,6 +35,24 @@ std::string report(params_type &params, user_list &users_list) {
 		<< stats.seeders << " seeders tracked\n"
 		<< stats.bytes_read << " bytes read\n"
 		<< stats.bytes_written << " bytes written\n";
+	} else if (action == "torrent") {
+                std::string info_hash_decoded = hex_decode(params["info_hash"]);
+                torrent_list::iterator tor = torrents.find(info_hash_decoded);
+                if (tor == torrents.end()) {
+		    output << "Torrent not found";
+		} else {
+		    output << "topic_id = " << tor->second.id << '\n'
+		    << "poster_id = " << tor->second.poster_id << '\n';
+		    output << "\nseeders:\n";
+		    for (peer_list::iterator it = tor->second.seeders.begin(); it != tor->second.seeders.end(); ++it) {
+			    output << "user " << it->second.user->get_id() << " " << it->second.ip << ":" << it->second.port << '\n';
+		    }
+		    output << "\nleechers:\n";
+		    for (peer_list::iterator it = tor->second.leechers.begin(); it != tor->second.leechers.end(); ++it) {
+			    output << "user " << it->second.user->get_id() << " " << it->second.ip << ":" << it->second.port << '\n';
+		    }
+		    output << "\n";
+		}
 	} else if (action == "user") {
 		std::string key = params["key"];
 		int user_id = atoi(params["user_id"].c_str());

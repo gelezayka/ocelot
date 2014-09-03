@@ -210,7 +210,7 @@ std::string worker::work(std::string &input, std::string &ip) {
 	}
 
 	if (action == UPDATE) {
-		if (passkey == conf->site_password) {
+		if (torrent_pass0 == conf->site_password) {
 			return update(params);
 		} else {
 			return error("Authentication failure");
@@ -218,8 +218,8 @@ std::string worker::work(std::string &input, std::string &ip) {
 	}
 
 	if (action == REPORT) {
-		if (passkey == conf->report_password) {
-			return report(params, users_list);
+		if (torrent_pass0 == conf->report_password) {
+			return report(params, users_list, torrents_list);
 		} else {
 			return error("Authentication failure");
 		}
@@ -513,7 +513,8 @@ std::string worker::announce(torrent &tor, user_ptr &u, params_type &params, par
 		db->record_peer(record_str, record_ip, peer_id);
 	}
 
-	wlog(L_DEBUG, "Add peer %s ip %s port %d for torrent %d", headers["user-agent"].c_str(), record_ip.c_str(), port, tor.id);
+	wlog(L_DEBUG, "Announce peer %s ip %s port %d for topic_id %d user_id %d", headers["user-agent"].c_str(), 
+	    record_ip.c_str(), port, tor.id, userid);
 
 	// Select peers!
 	unsigned int numwant;
