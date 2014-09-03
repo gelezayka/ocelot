@@ -10,6 +10,10 @@
 #include <mutex>
 #include <thread>
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include "log.h"
 
 #define DB_LOCK_TIMEOUT 50
@@ -125,8 +129,8 @@ void mysql::record_peer(std::string &record, std::string &ip, std::string &peer_
 		update_heavy_peer_buffer += ",";
 	}
 	mysqlpp::Query q = conn.query();
-	q << record << mysqlpp::quote << ip << ',' << mysqlpp::quote << peer_id << ',' << mysqlpp::quote << useragent << ","  << time(NULL)  << ')';
-
+	int iip = inet_addr(ip.c_str());
+	q << record << mysqlpp::quote << hex_encode(8, ntohl(iip)) << ',' << mysqlpp::quote << peer_id << ',' << mysqlpp::quote << useragent << ","  << time(NULL)  << ')';
 	update_heavy_peer_buffer += q.str();
 }
 void mysql::record_peer(std::string &record, std::string &ip, std::string &peer_id) {
@@ -134,7 +138,8 @@ void mysql::record_peer(std::string &record, std::string &ip, std::string &peer_
 		update_light_peer_buffer += ",";
 	}
 	mysqlpp::Query q = conn.query();
-	q << record << mysqlpp::quote << peer_id << ',' << mysqlpp::quote << ip << ',' << time(NULL) << ')';
+	int iip = inet_addr(ip.c_str());
+	q << record << mysqlpp::quote << peer_id << ',' << mysqlpp::quote << hex_encode(8, ntohl(iip)) << ',' << time(NULL) << ')';
 
 	update_light_peer_buffer += q.str();
 }

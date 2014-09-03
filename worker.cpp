@@ -513,6 +513,8 @@ std::string worker::announce(torrent &tor, user_ptr &u, params_type &params, par
 		db->record_peer(record_str, record_ip, peer_id);
 	}
 
+	wlog(L_DEBUG, "Add peer %s ip %s port %d for torrent %d", headers["user-agent"].c_str(), record_ip.c_str(), port, tor.id);
+
 	// Select peers!
 	unsigned int numwant;
 	params_type::const_iterator param_numwant = params.find("numwant");
