@@ -27,6 +27,8 @@
 #include "user.h"
 #include "log.h"
 
+#include "md5.cpp"
+
 //---------- Worker - does stuff with input
 worker::worker(torrent_list &torrents, user_list &users, std::vector<std::string> &_whitelist, config * conf_obj, mysql * db_obj) : torrents_list(torrents), users_list(users), whitelist(_whitelist), conf(conf_obj), db(db_obj)
 {
@@ -493,8 +495,7 @@ std::string worker::announce(torrent &tor, user_ptr &u, params_type &params, par
 	p->last_announced = cur_time;
 	p->visible = peer_is_visible(u, p);
 	bool seeder = left == 0;
-	boost::hash<std::string> string_hash;
-	std::size_t peer_hash = string_hash(peer_id+info_hash_decoded+inttostr(port)+ip);
+	std::string peer_hash = md5(info_hash_decoded+u->get_auth_key()+inttostr(port)+ip);
 	// Add peer data to the database
 	std::stringstream record;
 	std::string record_ip;
@@ -504,11 +505,11 @@ std::string worker::announce(torrent &tor, user_ptr &u, params_type &params, par
 		record_ip = ip;
 	}
 	if (peer_changed) {
-		record << '(' << userid << ',' << tor.id << ','  << uploaded << ',' << downloaded << ',' << upspeed << ',' << downspeed << ',' << left << ',' << seeder << ',' << port << ',' << peer_hash << ',';
+		record << '(' << userid << ',' << tor.id << ','  << uploaded << ',' << downloaded << ',' << upspeed << ',' << downspeed << ',' << left << ',' << seeder << ',' << port << ",'" << peer_hash << "',";
 		std::string record_str = record.str();
 		db->record_peer(record_str, record_ip, peer_id, headers["user-agent"]);
 	} else {
-		record << '(' << tor.id << ',' << peer_hash << ',' << userid << ',' << port << ',';
+		record << '(' << tor.id << ", '" << peer_hash << "'," << userid << ',' << port << ',';
 		std::string record_str = record.str();
 		db->record_peer(record_str, record_ip, peer_id);
 	}

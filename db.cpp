@@ -133,6 +133,7 @@ void mysql::record_peer(std::string &record, std::string &ip, std::string &peer_
 	q << record << mysqlpp::quote << hex_encode(8, ntohl(iip)) << ',' << mysqlpp::quote << peer_id << ',' << mysqlpp::quote << useragent << ","  << time(NULL)  << ')';
 	update_heavy_peer_buffer += q.str();
 }
+
 void mysql::record_peer(std::string &record, std::string &ip, std::string &peer_id) {
 	if (update_light_peer_buffer != "") {
 		update_light_peer_buffer += ",";
@@ -140,7 +141,6 @@ void mysql::record_peer(std::string &record, std::string &ip, std::string &peer_
 	mysqlpp::Query q = conn.query();
 	int iip = inet_addr(ip.c_str());
 	q << record << mysqlpp::quote << peer_id << ',' << mysqlpp::quote << hex_encode(8, ntohl(iip)) << ',' << time(NULL) << ')';
-
 	update_light_peer_buffer += q.str();
 }
 

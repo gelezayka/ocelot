@@ -84,12 +84,7 @@ int main(int argc, char **argv)
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
 
-	bool verbose = false;
-	for (int i = argc; i > 1; i--) {
-		if (!strcmp(argv[1], "-v")) {
-			verbose = true;
-		}
-	}
+	bool verbose = false; //debug > 0;
 
 	mysql db(conf.mysql_db, conf.mysql_host, conf.mysql_username, conf.mysql_password, conf.clean_peer_on_start);
 	if (!db.connected()) {
