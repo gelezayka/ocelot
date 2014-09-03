@@ -106,3 +106,15 @@ std::string bintohex(const std::string &in) {
 	}
 	return out;
 }
+
+std::string hex_encode(int l, int v)
+{
+        std::string r;
+        r.resize(l);
+        while (l--)
+        {
+                r[l] = "0123456789abcdef"[v & 0xf];
+                v >>= 4;
+        }
+        return r;
+};
