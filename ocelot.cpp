@@ -32,23 +32,28 @@ static void Usage() {
         fprintf(stderr, "usage: ocelot [OPTIONS]\n");
         fprintf(stderr, " -d            - run in debug mode\n");
         fprintf(stderr, " -f            - run in foreground\n");
-        fprintf(stderr, " -c file       - define config for usage\n");
+        fprintf(stderr, " -c file       - define config for usage\n"
+		"[-p<port>]\tTCP port number to listen on (default: %d)\n"
+	    , 34000);
         exit(EX_USAGE);
 }
 
-void parse_cmd(int ac, char *av[]) {
+void parse_cmd(int ac, char *av[], config &c) {
         int ch;
         /* Parse flags */
-        while ((ch = getopt(ac, av, "hdf:c:")) != -1) {
+        while ((ch = getopt(ac, av, "h:d:f:p:c:")) != -1) {
                 switch (ch) {
                 case 'd':
                         debug = 1;
                         break;
                 case 'f':
                         bg = 0;
+			break;
+                case 'p':
+                        c.port = atoi(optarg);
                         break;
                 case 'c':
-                        config_file = optarg;
+                        config_file = strdup(optarg);
                         break;
                 case 'h':
                 case '?':
@@ -62,9 +67,10 @@ void parse_cmd(int ac, char *av[]) {
 
 int main(int argc, char **argv)
 {
+	config conf;
 
         /* parse args and option there */
-	parse_cmd(argc, argv);
+	parse_cmd(argc, argv, conf);
 
         if ((debug == 1) || (bg == 0)) {
 	    set_log_level(L_DEBUG);
@@ -79,7 +85,6 @@ int main(int argc, char **argv)
 	// we don't use printf so make cout/cerr a little bit faster
 	std::ios_base::sync_with_stdio(false);
 
-	config conf;
 	
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
@@ -125,6 +130,8 @@ int main(int argc, char **argv)
 	torrent_list torrents_list;
 	db.load_torrents(torrents_list);
 	wlog(L_INFO, "Loaded %d torrents", torrents_list.size());
+
+	db.load_peers(torrents_list, users_list);
 
 	stats.open_connections = 0;
 	stats.opened_connections = 0;

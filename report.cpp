@@ -1,11 +1,24 @@
 #include <iostream>
 #include <map>
+#include <string>
 #include <sstream>
 #include "ocelot.h"
 #include "misc_functions.h"
 #include "report.h"
 #include "response.h"
 #include "user.h"
+
+namespace std
+{
+    template < typename T > std::string to_string( const T& n )
+    {
+        std::ostringstream stm ;
+        stm << n ;
+        return stm.str() ;
+    }
+}
+
+#include <iostream>
 
 std::string report(params_type &params, user_list &users_list, torrent_list &torrents) {
 	std::stringstream output;

@@ -49,9 +49,10 @@ class mysql {
 		mysql(std::string mysql_db, std::string mysql_host, std::string username, std::string password, bool clean_peer);
 		bool connected();
 		void load_torrents(torrent_list &torrents);
+		void load_peers(torrent_list &torrents, user_list &users);
 		void load_users(user_list &users);
 		void load_whitelist(std::vector<std::string> &whitelist);
-
+		
 		void record_user(std::string &record); // (id,uploaded_change,downloaded_change)
 		void record_torrent(std::string &record); // (id,seeders,leechers,snatched_change,balance)
 		void record_snatch(std::string &record, std::string &ip); // (uid,fid,tstamp)

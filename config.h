@@ -28,6 +28,7 @@ class config {
 		std::string mysql_password;
 		std::string site_password;
 		std::string report_password;
+		std::string torrent_pass_private_key;
 
 		config();
 };

@@ -58,6 +58,69 @@ void mysql::clear_peer_data() {
 		std::cerr << "Query error: " << er.what() << " in clear_peer_data" << std::endl;
 	}
 }
+/*
+peer_list::iterator mysql::add_peer(peer_list &peer_list, std::string &peer_id) {
+        peer new_peer;
+        std::pair<peer_list::iterator, bool> insert
+        = peer_list.insert(std::pair<std::string, peer>(peer_id, new_peer));
+        return insert.first;
+}
+*/
+void mysql::load_peers(torrent_list &torrents, user_list &users) {
+    int count = 0;
+    mysqlpp::Query query = conn.query("SELECT * from bb_bt_tracker where topic_id = %0q");
+    query.parse();
+    peer_list::iterator peer_it;
+    for (auto& it: torrents) {
+	if (mysqlpp::StoreQueryResult res = query.store(it.second.id)) {
+//	    size_t num_rows = res.num_rows();
+//	    for (size_t i = 0; i < num_rows; i++) {
+	    for (auto& row: res) {
+		struct in_addr ip_addr;
+		ip_addr.s_addr = htonl(hex2dec(std::string(row["ip"])));
+		std::string ip(inet_ntoa(ip_addr));
+//		mysqlpp::Row row = rit.second;
+	    	user_list::iterator u = users.find(row["user_id"]);
+	    	if (u == users.end()) {
+	    	    continue;
+	    	}
+	    	/*
+	        std::cout << "user_id " << row["user_id"] << " ip " << row["ip"] << " port " << row["port"]
+	    	    << " ip " << ip << "\n";
+	    	*/
+	    	std::string peer_id(row["peer_id"]);	
+	    	if (row["seeder"] == "1") {
+	    	    peer new_peer;
+	    	    std::pair<peer_list::iterator, bool> insert = it.second.seeders.insert(std::pair<std::string, peer>(peer_id, new_peer));
+	    	    //peer_it = add_peer(it.second.seeders, peer_id);
+	    	    peer_it = insert.first;
+	    	} else {
+	    	    peer new_peer;
+	    	    std::pair<peer_list::iterator, bool> insert = it.second.leechers.insert(std::pair<std::string, peer>(peer_id, new_peer));
+    	    	    //peer_it = add_peer(it.second.leechers, peer_id);
+		    peer_it = insert.first;
+	    	}
+
+	    	peer * p = &peer_it->second;
+	    	p->port = std::stoi(std::string(row["port"]));
+	    	p->uploaded = row["uploaded"];
+	    	p->downloaded = row["downloaded"];
+	    	p->corrupt = 0;
+	    	p->left = 0;
+	    	p->last_announced = 0;
+	    	p->first_announced = 0;
+	    	p->announces = 1;
+	    	p->visible = true;
+	    	p->invalid_ip = false;
+	    	p->user = u->second;
+	    	p->ip_port = std::string(row["port"]);
+	    	p->ip = ip;
+	    	count++;
+	    }
+	}
+    }
+    wlog(L_INFO, "Loaded %d peers", count);
+}
 
 void mysql::load_torrents(torrent_list &torrents) {
 	mysqlpp::Query query = conn.query("SELECT topic_id, info_hash, tor_type, complete_count, poster_id FROM bb_bt_torrents ORDER BY topic_id;");
@@ -264,7 +327,7 @@ void mysql::flush_peers() {
 			std::string("seeder,port,peer_hash,ip,peer_id,client,update_time) VALUES ") + update_heavy_peer_buffer +
 					" ON DUPLICATE KEY UPDATE uploaded=VALUES(uploaded), up_add=VALUES(uploaded)," +
 					"downloaded=VALUES(downloaded), speed_up=VALUES(speed_up), down_add=VALUES(downloaded), " +
-					"speed_down=VALUES(speed_down), remain=VALUES(remain), " +
+					"speed_down=VALUES(speed_down), remain=VALUES(remain), client=VALUES(client), " +
 					"update_time=VALUES(update_time), peer_id=VALUES(peer_id), seeder=VALUES(seeder)" ;
 		peer_queue.push(sql);
 		update_heavy_peer_buffer.clear();
@@ -375,6 +438,7 @@ void mysql::do_flush_peers() {
 		while (peer_queue.size() > 0) {
 			try {
 				std::string sql = peer_queue.front();
+wlog(L_DEBUG, "run sql: %s", sql.c_str());
 				mysqlpp::Query query = c.query(sql);
 				if (!query.exec()) {
 					wlog(L_CRIT, "Peer flush failed (%d remain)", peer_queue.size());

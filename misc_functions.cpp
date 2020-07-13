@@ -2,6 +2,8 @@
 #include <iostream>
 #include <sstream>
 
+#include <string.h>
+
 long strtolong(const std::string& str) {
 	std::istringstream stream (str);
 	long i = 0;
@@ -118,3 +120,15 @@ std::string hex_encode(int l, int v)
         }
         return r;
 };
+
+std::string xbt_hex_decode(const std::string& v)
+{
+        std::string r;
+        r.resize(v.length() >> 1);
+        for (size_t i = 0; i + 2 <= v.length(); i += 2)
+        {
+                int a = hex_decode(v[i]);
+                r[i >> 1] = a << 4 | hex_decode(v[i + 1]);
+        }
+        return r;
+}

@@ -66,7 +66,7 @@ connection_mother::connection_mother(worker * worker_obj, config * config_obj, m
 	schedule_event.set(conf->schedule_interval, conf->schedule_interval); // After interval, every interval
 	schedule_event.start();
 
-	wlog(L_INFO, "Sockets up, starting event loop!");
+	wlog(L_INFO, "Listen port %d, starting event loop!", conf->port);
 	ev_loop(ev_default_loop(0), 0);
 }
 

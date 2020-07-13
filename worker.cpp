@@ -11,11 +11,14 @@
 #include <algorithm>
 #include <mutex>
 #include <thread>
+#include <bitset>
 
 #include <boost/functional/hash.hpp>
+#include <boost/format.hpp>
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 #include "ocelot.h"
 #include "config.h"
@@ -28,6 +31,7 @@
 #include "log.h"
 
 #include "md5.cpp"
+#include "sha1.h"
 
 //---------- Worker - does stuff with input
 worker::worker(torrent_list &torrents, user_list &users, std::vector<std::string> &_whitelist, config * conf_obj, mysql * db_obj) : torrents_list(torrents), users_list(users), whitelist(_whitelist), conf(conf_obj), db(db_obj)
@@ -231,6 +235,7 @@ std::string worker::work(std::string &input, std::string &ip) {
 	user_list::iterator u;
 	if(torrent_pass0.length() == 32)  {
 	    int user_id = hex2dec(torrent_pass0.substr(0, 8));
+	    wlog(L_DEBUG, "request for user_id %d", user_id);
 	    u = users_list.find(user_id);
 	} else {
 	    return error("Passkey incorrect length");
@@ -238,6 +243,12 @@ std::string worker::work(std::string &input, std::string &ip) {
 
 	if (u == users_list.end()) {
 		return error("Passkey not found");
+	}
+
+	// check passkey
+	if (Csha1((boost::format("%s %s %d %s") % conf->torrent_pass_private_key % \
+			u->second->get_auth_key() % u->second->get_id() % hex_decode(params["info_hash"])).str()).read().substr(0, 12) != xbt_hex_decode(torrent_pass0.substr(8))) {
+		return error("Passkey Authentication failure");
 	}
 
 	if (action == ANNOUNCE) {
@@ -495,7 +506,25 @@ std::string worker::announce(torrent &tor, user_ptr &u, params_type &params, par
 	p->last_announced = cur_time;
 	p->visible = peer_is_visible(u, p);
 	bool seeder = left == 0;
-	std::string peer_hash = md5(info_hash_decoded+u->get_auth_key()+inttostr(port)+ip);
+        std::string port_st, ip_st, peer_hash;
+	port_st += ntohs(port);
+	port_st += ntohs(port) >> 8;
+	int iip = inet_addr(ip.c_str());
+	ip_st = hex_encode(8, ntohl(iip));
+
+	// Peer unique id
+	//$peer_hash = md5(rtrim($info_hash,' ').$passkey.$ip.$port);
+
+//	wlog(L_DEBUG, "string for md5: %s", (info_hash_decoded+u->get_auth_key()+port_st+ip_st).c_str());
+	wlog(L_DEBUG, "info_hash: %s", params["info_hash"].c_str());
+	wlog(L_DEBUG, "passkey: %s", u->get_auth_key().c_str());
+	wlog(L_DEBUG, "md5 for info_hash: %s", md5(info_hash_decoded).c_str());
+	wlog(L_DEBUG, "md5 for info_hash+passkey: %s", md5(info_hash_decoded+u->get_auth_key()).c_str());
+	wlog(L_DEBUG, "md5 for info_hash+passkey+port_st: %s", md5(info_hash_decoded+u->get_auth_key()+port_st).c_str());
+	wlog(L_DEBUG, "port_st: %s len", bintohex(port_st).c_str());
+	wlog(L_DEBUG, "ip_st: %s", ip_st.c_str());
+	peer_hash = md5(info_hash_decoded+u->get_auth_key()+port_st+ip_st);
+
 	// Add peer data to the database
 	std::stringstream record;
 	std::string record_ip;
